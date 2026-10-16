@@ -1,0 +1,2 @@
+# Local-first runtime data lives here (SQLite databases, demo artifacts).
+# The directory itself is tracked; generated *.sqlite files are gitignored.

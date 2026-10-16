@@ -1,0 +1,675 @@
+{
+  "name": "memory-core",
+  "version": "v1",
+  "description": "MemForge's own memory-system evaluation. 36 deterministic cases across retrieval, duplicate handling, conflict handling, context compilation, the memory lifecycle and agent-memory behaviour. Every case states a corpus, a call and what should have happened; nothing here scores generated prose and no judge model is involved.",
+  "cases": [
+    {
+      "id": "ret-001",
+      "title": "A relevant profile memory is found by an unrelated corpus",
+      "category": "retrieval",
+      "action": "search",
+      "query": "which programming languages does the user write",
+      "rationale": "The single memory that overlaps the query must be returned even though it is a minority of the corpus.",
+      "top_k": 5,
+      "fixture": [
+        {"label": "skills", "content": "The user writes Python and SQL for backend services every day.", "memory_type": "FACT", "confidence": 0.9, "importance": 0.8},
+        {"label": "groceries", "content": "The user buys oat milk and brown rice on Fridays.", "memory_type": "OBSERVATION", "confidence": 0.4, "importance": 0.2},
+        {"label": "commute", "content": "The user takes the 7:40 train fromplatform two each morning.", "memory_type": "OBSERVATION", "confidence": 0.3, "importance": 0.1}
+      ],
+      "expected": {
+        "required": ["skills"],
+        "metrics": ["retrieval_recall", "retrieval_precision", "top_k_hit_rate"]
+      }
+    },
+    {
+      "id": "ret-002",
+      "title": "Irrelevant memories never enter a result set",
+      "category": "retrieval",
+      "action": "search",
+      "query": "python backend service experience",
+      "rationale": "Memories that share no query term must stay out of the result set entirely.",
+      "top_k": 5,
+      "fixture": [
+        {"label": "backend", "content": "The user shipped a Python backend service handling payments.", "memory_type": "FACT", "confidence": 0.9, "importance": 0.9},
+        {"label": "gardening", "content": "The user grows tomatoes and basil on a balcony.", "memory_type": "OBSERVATION", "confidence": 0.6, "importance": 0.3},
+        {"label": "cinema", "content": "The user watches arthouse films on Sunday evenings.", "memory_type": "OBSERVATION", "confidence": 0.5, "importance": 0.2},
+        {"label": "bicycle", "content": "The user rides a fixed gear bicycle to the office.", "memory_type": "OBSERVATION", "confidence": 0.7, "importance": 0.4}
+      ],
+      "expected": {
+        "required": ["backend"],
+        "forbidden": ["gardening", "cinema", "bicycle"],
+        "metrics": ["retrieval_recall", "retrieval_precision", "top_k_hit_rate", "recall_relevance"]
+      }
+    },
+    {
+      "id": "ret-003",
+      "title": "Several similar memories are all returned",
+      "category": "retrieval",
+      "action": "search",
+      "query": "kubernetes deployment rollout",
+      "rationale": "Two independent memories about the same topic must both survive; suppression is for duplicates, not for topical similarity.",
+      "top_k": 5,
+      "fixture": [
+        {"label": "rollout", "content": "The user switched the kubernetes deployment rollout to a canary strategy.", "memory_type": "FACT", "confidence": 0.8, "importance": 0.7},
+        {"label": "cluster", "content": "The user runs three kubernetes clusters across two regions.", "memory_type": "FACT", "confidence": 0.75, "importance": 0.6},
+        {"label": "lunch", "content": "The user usually eats lunch at the food court downstairs.", "memory_type": "OBSERVATION", "confidence": 0.5, "importance": 0.2}
+      ],
+      "expected": {
+        "required": ["rollout", "cluster"],
+        "metrics": ["retrieval_recall", "retrieval_precision", "top_k_hit_rate"]
+      }
+    },
+    {
+      "id": "ret-004",
+      "title": "A recent memory outranks an old one for the same topic",
+      "category": "retrieval",
+      "action": "search",
+      "query": "current engineering team",
+      "rationale": "Temporal decay and explicit importance must move the newer, more important memory to the top.",
+      "top_k": 1,
+      "fixture": [
+        {"label": "old_team", "content": "The user was part of a five person payments engineering team.", "memory_type": "FACT", "confidence": 0.5, "importance": 0.4, "age_minutes": 1},
+        {"label": "new_team", "content": "The user now leads an eleven person platform engineering team.", "memory_type": "FACT", "confidence": 0.9, "importance": 0.9, "age_minutes": 43200}
+      ],
+      "expected": {
+        "required": ["new_team"],
+        "metrics": ["retrieval_recall", "retrieval_precision", "top_k_hit_rate"]
+      }
+    },
+    {
+      "id": "ret-005",
+      "title": "Confidence separates two memories that share every other signal",
+      "category": "retrieval",
+      "action": "search",
+      "query": "expected salary range",
+      "rationale": "With importance and freshness equal, the more confident memory must rank first.",
+      "top_k": 1,
+      "fixture": [
+        {"label": "guessed_salary", "content": "The user expects a salary of about eighteen lakhs per year.", "memory_type": "PREFERENCE", "confidence": 0.2, "importance": 0.5},
+        {"label": "stated_salary", "content": "The user expects a salary of about twenty four lakhs per year.", "memory_type": "PREFERENCE", "confidence": 0.95, "importance": 0.5}
+      ],
+      "expected": {
+        "required": ["stated_salary"],
+        "metrics": ["retrieval_recall", "retrieval_precision", "top_k_hit_rate"]
+      }
+    },
+    {
+      "id": "ret-006",
+      "title": "A strongly matching memory reaches the top of a noisy result set",
+      "category": "retrieval",
+      "action": "search",
+      "query": "vector database migration plan",
+      "rationale": "The memory covering both query concepts must reach the first rank even when weaker matches exist.",
+      "top_k": 5,
+      "fixture": [
+        {"label": "migration", "content": "The user is migrating the vector database from pgvector to a dedicated index.", "memory_type": "TASK", "confidence": 0.95, "importance": 0.9},
+        {"label": "vector_only", "content": "The user read the vector search paper last month.", "memory_type": "OBSERVATION", "confidence": 0.6, "importance": 0.3},
+        {"label": "database_only", "content": "The user runs the database on a managed instance.", "memory_type": "FACT", "confidence": 0.6, "importance": 0.3},
+        {"label": "plan_only", "content": "The user keeps a written plan for every migration window.", "memory_type": "OBSERVATION", "confidence": 0.5, "importance": 0.2}
+      ],
+      "expected": {
+        "required": ["migration"],
+        "metrics": ["retrieval_recall", "retrieval_precision", "top_k_hit_rate"]
+      }
+    },
+    {
+      "id": "ret-007",
+      "title": "No memory is invented when nothing matches the query",
+      "category": "retrieval",
+      "action": "search",
+      "query": "quarterly revenue forecast",
+      "rationale": "A query that matches nothing must return nothing rather than a plausible-looking memory.",
+      "top_k": 5,
+      "fixture": [
+        {"label": "oat_milk", "content": "The user drinks oat milk with breakfast.", "memory_type": "OBSERVATION", "confidence": 0.5, "importance": 0.2},
+        {"label": "bicycle", "content": "The user commutes by bicycle in summer.", "memory_type": "OBSERVATION", "confidence": 0.6, "importance": 0.3}
+      ],
+      "expected": {
+        "forbidden": ["oat_milk", "bicycle"],
+        "metrics": ["recall_relevance"]
+      }
+    },
+
+    {
+      "id": "dup-001",
+      "title": "A near-duplicate memory is suppressed in favour of the original",
+      "category": "duplicate",
+      "action": "search_with_duplicates",
+      "query": "editor theme preference",
+      "rationale": "Two memories saying the same thing must yield one result, and the more important one must be the survivor.",
+      "top_k": 5,
+      "fixture": [
+        {"label": "original", "content": "The user prefers the dark theme in every code editor.", "memory_type": "PREFERENCE", "confidence": 0.9, "importance": 0.9},
+        {"label": "restated", "content": "The user prefers the dark theme in all code editors.", "memory_type": "OBSERVATION", "confidence": 0.4, "importance": 0.2},
+        {"label": "lunch", "content": "The user packs lunch on Sundays.", "memory_type": "OBSERVATION", "confidence": 0.5, "importance": 0.2}
+      ],
+      "expected": {
+        "required": ["original"],
+        "duplicates_suppressed": ["restated"],
+        "metrics": ["retrieval_recall", "retrieval_precision", "top_k_hit_rate", "duplicate_suppression_accuracy"]
+      }
+    },
+    {
+      "id": "dup-002",
+      "title": "An exactly repeated memory is suppressed",
+      "category": "duplicate",
+      "action": "search_with_duplicates",
+      "query": "stand up meeting time",
+      "rationale": "Identical content is the strongest duplicate signal and must still yield exactly one result.",
+      "top_k": 5,
+      "fixture": [
+        {"label": "original", "content": "The team stand up meeting happens at half past nine.", "memory_type": "FACT", "confidence": 0.8, "importance": 0.9},
+        {"label": "copy", "content": "The team stand up meeting happens at half past nine.", "memory_type": "OBSERVATION", "confidence": 0.3, "importance": 0.2},
+        {"label": "coffee", "content": "The user drinks two espressos before noon.", "memory_type": "OBSERVATION", "confidence": 0.6, "importance": 0.3}
+      ],
+      "expected": {
+        "required": ["original"],
+        "duplicates_suppressed": ["copy"],
+        "metrics": ["retrieval_recall", "retrieval_precision", "top_k_hit_rate", "duplicate_suppression_accuracy"]
+      }
+    },
+    {
+      "id": "dup-003",
+      "title": "Several copies of one memory are all suppressed",
+      "category": "duplicate",
+      "action": "search_with_duplicates",
+      "query": "home office setup",
+      "rationale": "One canonical memory may have many restatements; every restatement must be dropped, not just the first.",
+      "top_k": 10,
+      "fixture": [
+        {"label": "original", "content": "The user works from a home office with a standing desk.", "memory_type": "FACT", "confidence": 0.8, "importance": 0.95},
+        {"label": "copy_a", "content": "The user works from a home office with a standing desk too.", "memory_type": "OBSERVATION", "confidence": 0.3, "importance": 0.4},
+        {"label": "copy_b", "content": "The user works from a home office that has a standing desk.", "memory_type": "OBSERVATION", "confidence": 0.3, "importance": 0.3},
+        {"label": "grocery", "content": "The user shops for groceries on the way home.", "memory_type": "OBSERVATION", "confidence": 0.5, "importance": 0.2}
+      ],
+      "expected": {
+        "required": ["original"],
+        "duplicates_suppressed": ["copy_a", "copy_b"],
+        "metrics": ["retrieval_recall", "retrieval_precision", "top_k_hit_rate", "duplicate_suppression_accuracy"]
+      }
+    },
+    {
+      "id": "dup-004",
+      "title": "An unrelated memory is not caught by duplicate suppression",
+      "category": "duplicate",
+      "action": "search_with_duplicates",
+      "query": "call rotation payments",
+      "rationale": "Suppression must fire only on redundancy; a memory that merely shares vocabulary has to survive.",
+      "top_k": 5,
+      "fixture": [
+        {"label": "rotation", "content": "The user runs the on call rotation for the payments service.", "memory_type": "FACT", "confidence": 0.9, "importance": 0.8},
+        {"label": "page", "content": "The user was paged once during the on call rotation last quarter.", "memory_type": "OBSERVATION", "confidence": 0.5, "importance": 0.3},
+        {"label": "postmortem", "content": "The user wrote the postmortem for the payments service outage.", "memory_type": "FACT", "confidence": 0.7, "importance": 0.6}
+      ],
+      "expected": {
+        "required": ["rotation", "page", "postmortem"],
+        "metrics": ["retrieval_recall", "retrieval_precision", "top_k_hit_rate"]
+      }
+    },
+    {
+      "id": "dup-005",
+      "title": "Two similar memories below the similarity threshold both survive",
+      "category": "duplicate",
+      "action": "search_with_duplicates",
+      "query": "gym training schedule",
+      "rationale": "Two sessions on different days are not duplicates; the Dice threshold must not collapse them.",
+      "top_k": 5,
+      "fixture": [
+        {"label": "monday", "content": "The user trains legs at the gym on Monday.", "memory_type": "OBSERVATION", "confidence": 0.7, "importance": 0.4},
+        {"label": "stretching", "content": "The user stretches at the gym before every training session.", "memory_type": "OBSERVATION", "confidence": 0.7, "importance": 0.4},
+        {"label": "kettlebell", "content": "The user bought a kettlebell set last month.", "memory_type": "OBSERVATION", "confidence": 0.4, "importance": 0.2}
+      ],
+      "expected": {
+        "required": ["monday", "stretching"],
+        "metrics": ["retrieval_recall", "retrieval_precision", "top_k_hit_rate"]
+      }
+    },
+
+    {
+      "id": "con-001",
+      "title": "The more confident memory wins a conflict",
+      "category": "conflict",
+      "action": "search_with_conflict",
+      "query": "preferred backend language",
+      "rationale": "Two memories state the same attribute with different values; confidence must decide and the loser must leave the result set.",
+      "top_k": 5,
+      "fixture": [
+        {"label": "python_pref", "content": "preferred backend language = Python", "memory_type": "PREFERENCE", "confidence": 0.4, "importance": 0.5},
+        {"label": "typescript_pref", "content": "preferred backend language = TypeScript", "memory_type": "PREFERENCE", "confidence": 0.95, "importance": 0.5},
+        {"label": "coffee", "content": "The user switched to a third wave coffee shop.", "memory_type": "OBSERVATION", "confidence": 0.5, "importance": 0.2}
+      ],
+      "expected": {
+        "required": ["typescript_pref"],
+        "winner": "typescript_pref",
+        "stale": ["python_pref"],
+        "token_budget": 1200,
+        "metrics": ["conflict_resolution_accuracy", "stale_memory_avoidance", "retrieval_recall", "retrieval_precision", "top_k_hit_rate", "context_budget_compliance", "context_provenance_completeness"]
+      }
+    },
+    {
+      "id": "con-002",
+      "title": "Explicit importance outranks confidence when resolving a conflict",
+      "category": "conflict",
+      "action": "search_with_conflict",
+      "query": "preferred database engine",
+      "rationale": "Importance is the first factor in the documented resolution policy, so it must beat a higher confidence.",
+      "top_k": 5,
+      "fixture": [
+        {"label": "postgres_pref", "content": "preferred database engine = PostgreSQL", "memory_type": "PREFERENCE", "confidence": 0.3, "importance": 0.95},
+        {"label": "mysql_pref", "content": "preferred database engine = MySQL", "memory_type": "PREFERENCE", "confidence": 0.9, "importance": 0.3}
+      ],
+      "expected": {
+        "required": ["postgres_pref"],
+        "winner": "postgres_pref",
+        "stale": ["mysql_pref"],
+        "token_budget": 1200,
+        "metrics": ["conflict_resolution_accuracy", "stale_memory_avoidance", "retrieval_recall", "retrieval_precision", "top_k_hit_rate", "context_budget_compliance", "context_provenance_completeness"]
+      }
+    },
+    {
+      "id": "con-003",
+      "title": "The newer memory wins when importance and confidence tie",
+      "category": "conflict",
+      "action": "search_with_conflict",
+      "query": "preferred code editor",
+      "rationale": "With every other factor equal, recency decides, which is why the fixture controls storage order.",
+      "top_k": 5,
+      "fixture": [
+        {"label": "older_editor", "content": "preferred code editor = Sublime Text", "memory_type": "PREFERENCE", "confidence": 0.6, "importance": 0.5, "age_minutes": 60},
+        {"label": "newer_editor", "content": "preferred code editor = Neovim", "memory_type": "PREFERENCE", "confidence": 0.6, "importance": 0.5, "age_minutes": 1}
+      ],
+      "expected": {
+        "required": ["newer_editor"],
+        "winner": "newer_editor",
+        "stale": ["older_editor"],
+        "token_budget": 1200,
+        "metrics": ["conflict_resolution_accuracy", "stale_memory_avoidance", "retrieval_recall", "retrieval_precision", "top_k_hit_rate", "context_budget_compliance", "context_provenance_completeness"]
+      }
+    },
+    {
+      "id": "con-004",
+      "title": "An unresolved conflict keeps both memories retrievable",
+      "category": "conflict",
+      "action": "search_with_conflict",
+      "query": "preferred frontend framework",
+      "resolve_conflict": false,
+      "rationale": "Until somebody resolves a conflict, neither side may vanish: hiding it would lose information the user never retracted.",
+      "top_k": 5,
+      "fixture": [
+        {"label": "react_pref", "content": "preferred frontend framework = React", "memory_type": "PREFERENCE", "confidence": 0.7, "importance": 0.6},
+        {"label": "svelte_pref", "content": "preferred frontend framework = Svelte", "memory_type": "PREFERENCE", "confidence": 0.6, "importance": 0.6}
+      ],
+      "expected": {
+        "required": ["react_pref", "svelte_pref"],
+        "token_budget": 1200,
+        "metrics": ["retrieval_recall", "retrieval_precision", "top_k_hit_rate", "context_budget_compliance", "context_provenance_completeness"]
+      }
+    },
+    {
+      "id": "con-005",
+      "title": "A superseded memory is suppressed from the compiled context",
+      "category": "conflict",
+      "action": "compile",
+      "query": "preferred deployment region",
+      "resolve_conflict": true,
+      "archive_conflict_loser": false,
+      "rationale": "With the loser still ACTIVE, only M4's conflict-superseded rule can keep it out of the context.",
+      "fixture": [
+        {"label": "us_region", "content": "preferred deployment region = us-east-1", "memory_type": "PREFERENCE", "confidence": 0.4, "importance": 0.5},
+        {"label": "eu_region", "content": "preferred deployment region = eu-west-1", "memory_type": "PREFERENCE", "confidence": 0.9, "importance": 0.5},
+        {"label": "oncall", "content": "The user takes the first on call shift each month.", "memory_type": "OBSERVATION", "confidence": 0.6, "importance": 0.3}
+      ],
+      "expected": {
+        "winner": "eu_region",
+        "stale": ["us_region"],
+        "selected": ["eu_region"],
+        "token_budget": 1200,
+        "metrics": ["conflict_resolution_accuracy", "stale_memory_avoidance", "context_selection_accuracy", "context_budget_compliance", "context_provenance_completeness"]
+      }
+    },
+    {
+      "id": "con-006",
+      "title": "Different attributes never collide with each other",
+      "category": "conflict",
+      "action": "search_with_conflict",
+      "query": "preferred",
+      "resolve_conflict": true,
+      "rationale": "Three memories each state a different attribute; a conflict detector must not invent one.",
+      "top_k": 5,
+      "fixture": [
+        {"label": "language", "content": "preferred backend language = Go", "memory_type": "PREFERENCE", "confidence": 0.8, "importance": 0.7},
+        {"label": "database", "content": "preferred database = PostgreSQL", "memory_type": "PREFERENCE", "confidence": 0.8, "importance": 0.7},
+        {"label": "framework", "content": "preferred framework = FastAPI", "memory_type": "PREFERENCE", "confidence": 0.8, "importance": 0.7}
+      ],
+      "expected": {
+        "required": ["language", "database", "framework"],
+        "token_budget": 1200,
+        "metrics": ["retrieval_recall", "retrieval_precision", "top_k_hit_rate", "context_budget_compliance", "context_provenance_completeness"]
+      }
+    },
+
+    {
+      "id": "ctx-001",
+      "title": "A tight budget compiles a short context without exceeding it",
+      "category": "context",
+      "action": "compile",
+      "query": "user reading habits",
+      "rationale": "With a very small budget the compiler must drop candidates rather than overrun.",
+      "fixture": [
+        {"label": "morning", "content": "The user reads technical books before breakfast every morning.", "memory_type": "OBSERVATION", "confidence": 0.7, "importance": 0.4},
+        {"label": "night", "content": "The user reads long essays late at night.", "memory_type": "OBSERVATION", "confidence": 0.7, "importance": 0.4},
+        {"label": "podcast", "content": "The user listens to podcasts while commuting.", "memory_type": "OBSERVATION", "confidence": 0.6, "importance": 0.3},
+        {"label": "library", "content": "The user borrowed three books from the city library.", "memory_type": "OBSERVATION", "confidence": 0.6, "importance": 0.3}
+      ],
+      "expected": {
+        "token_budget": 60,
+        "metrics": ["context_budget_compliance", "context_provenance_completeness"]
+      }
+    },
+    {
+      "id": "ctx-002",
+      "title": "A large candidate pool still fits the budget",
+      "category": "context",
+      "action": "compile",
+      "query": "user project history",
+      "rationale": "Many candidates compete; the compiler must rank them and emit only what fits.",
+      "fixture": [
+        {"label": "billing", "content": "The user led the billing service rewrite at their previous company.", "memory_type": "EVENT", "confidence": 0.9, "importance": 0.9},
+        {"label": "search", "content": "The user built the search relevance service for an online store.", "memory_type": "EVENT", "confidence": 0.8, "importance": 0.7},
+        {"label": "mobile", "content": "The user shipped the first mobile release of a fintech app.", "memory_type": "EVENT", "confidence": 0.8, "importance": 0.7},
+        {"label": "data", "content": "The user migrated the analytics warehouse to a new engine.", "memory_type": "EVENT", "confidence": 0.7, "importance": 0.6},
+        {"label": "infra", "content": "The user automated the infrastructure provisioning pipeline.", "memory_type": "EVENT", "confidence": 0.7, "importance": 0.6},
+        {"label": "hiring", "content": "The user interviewed twenty candidates for a backend role.", "memory_type": "EVENT", "confidence": 0.6, "importance": 0.5},
+        {"label": "docs", "content": "The user rewrote the internal onboarding documentation.", "memory_type": "EVENT", "confidence": 0.5, "importance": 0.4},
+        {"label": "lunch", "content": "The user eats lunch at the food court downstairs.", "memory_type": "OBSERVATION", "confidence": 0.4, "importance": 0.2}
+      ],
+      "expected": {
+        "selected": ["billing"],
+        "token_budget": 90,
+        "metrics": ["context_budget_compliance", "context_selection_accuracy", "context_provenance_completeness"]
+      }
+    },
+    {
+      "id": "ctx-003",
+      "title": "A duplicate memory never reaches the compiled context",
+      "category": "context",
+      "action": "compile",
+      "query": "user workspace monitor",
+      "rationale": "M4 must drop a near-duplicate even when the budget would have allowed it.",
+      "fixture": [
+        {"label": "primary", "content": "The user works on a single 27 inch monitor.", "memory_type": "FACT", "confidence": 0.85, "importance": 0.8},
+        {"label": "repetition", "content": "The user works on one 27 inch monitor only.", "memory_type": "OBSERVATION", "confidence": 0.3, "importance": 0.2},
+        {"label": "keyboard", "content": "The user types on a mechanical keyboard.", "memory_type": "OBSERVATION", "confidence": 0.6, "importance": 0.3}
+      ],
+      "expected": {
+        "selected": ["primary"],
+        "duplicates_suppressed": ["repetition"],
+        "token_budget": 400,
+        "metrics": ["context_budget_compliance", "context_selection_accuracy", "context_provenance_completeness", "duplicate_suppression_accuracy"]
+      }
+    },
+    {
+      "id": "ctx-004",
+      "title": "A budget too small for any memory still compiles cleanly",
+      "category": "context",
+      "action": "compile",
+      "query": "user relocation plans",
+      "rationale": "An impossible budget must produce an empty, in-budget context rather than an error or an overrun.",
+      "fixture": [
+        {"label": "relocation", "content": "The user plans to relocate to another city for a new role.", "memory_type": "EVENT", "confidence": 0.8, "importance": 0.7}
+      ],
+      "expected": {
+        "token_budget": 1,
+        "metrics": ["context_budget_compliance"]
+      }
+    },
+    {
+      "id": "ctx-005",
+      "title": "Five short memories are preferred over one very long one",
+      "category": "context",
+      "action": "compile",
+      "query": "user commute habits",
+      "rationale": "The utility model charges for token cost, so a cheap high relevance memory beats an expensive vague one.",
+      "fixture": [
+        {"label": "train", "content": "The user commutes by train.", "memory_type": "OBSERVATION", "confidence": 0.8, "importance": 0.5},
+        {"label": "walk", "content": "The user walks to the station.", "memory_type": "OBSERVATION", "confidence": 0.7, "importance": 0.4},
+        {"label": "bus", "content": "The user takes the bus after the train.", "memory_type": "OBSERVATION", "confidence": 0.6, "importance": 0.3},
+        {"label": "long_ride", "content": "The user once described a commute that started before sunrise and involved a train, a bus, a ferry and a long walk through a busy city centre before finally arriving at the office more than two hours after leaving home, which they described as the worst commute of their life and which they still think about whenever the weather is bad.", "memory_type": "OBSERVATION", "confidence": 0.4, "importance": 0.2}
+      ],
+      "expected": {
+        "token_budget": 120,
+        "metrics": ["context_budget_compliance", "context_provenance_completeness"]
+      }
+    },
+    {
+      "id": "ctx-006",
+      "title": "Every selected block carries usable provenance",
+      "category": "context",
+      "action": "compile",
+      "query": "user learning habits",
+      "rationale": "Each rendered block must be traceable back to exactly one stored memory.",
+      "fixture": [
+        {"label": "course", "content": "The user completed a distributed systems course.", "memory_type": "EVENT", "confidence": 0.8, "importance": 0.6},
+        {"label": "book", "content": "The user finished Designing Data Intensive Applications.", "memory_type": "EVENT", "confidence": 0.7, "importance": 0.5},
+        {"label": "talk", "content": "The user watched a conference talk about consensus.", "memory_type": "OBSERVATION", "confidence": 0.6, "importance": 0.4}
+      ],
+      "expected": {
+        "token_budget": 400,
+        "metrics": ["context_budget_compliance", "context_provenance_completeness"]
+      }
+    },
+    {
+      "id": "ctx-007",
+      "title": "A conflicting pair under a tight budget keeps only the winner",
+      "category": "context",
+      "action": "compile",
+      "query": "preferred testing framework",
+      "resolve_conflict": true,
+      "rationale": "Budget pressure and conflict pressure must compose without letting the loser back in.",
+      "fixture": [
+        {"label": "pytest_pref", "content": "preferred testing framework = pytest", "memory_type": "PREFERENCE", "confidence": 0.9, "importance": 0.9},
+        {"label": "jest_pref", "content": "preferred testing framework = Jest", "memory_type": "PREFERENCE", "confidence": 0.3, "importance": 0.9}
+      ],
+      "expected": {
+        "winner": "pytest_pref",
+        "stale": ["jest_pref"],
+        "selected": ["pytest_pref"],
+        "token_budget": 80,
+        "metrics": ["conflict_resolution_accuracy", "stale_memory_avoidance", "context_selection_accuracy", "context_budget_compliance", "context_provenance_completeness"]
+      }
+    },
+
+    {
+      "id": "lif-001",
+      "title": "Create, update and forget each append one history version",
+      "category": "lifecycle",
+      "action": "lifecycle",
+      "query": "user relocation plans",
+      "lifecycle_steps": ["update", "forget"],
+      "rationale": "The append-only history is the audit trail; every mutating operation must be visible in it.",
+      "fixture": [
+        {"label": "target", "content": "The user plans to relocate to another city for a new role.", "memory_type": "EVENT", "confidence": 0.7, "importance": 0.6}
+      ],
+      "expected": {
+        "expected_versions": 3,
+        "metrics": ["history_preservation"]
+      }
+    },
+    {
+      "id": "lif-002",
+      "title": "Archiving preserves history just like forgetting does",
+      "category": "lifecycle",
+      "action": "lifecycle",
+      "query": "user relocation plans",
+      "lifecycle_steps": ["archive", "forget"],
+      "rationale": "Archiving is not deletion; its history must survive the later forget.",
+      "fixture": [
+        {"label": "target", "content": "The user plans to relocate to another city for a new role.", "memory_type": "EVENT", "confidence": 0.7, "importance": 0.6}
+      ],
+      "expected": {
+        "expected_versions": 3,
+        "metrics": ["history_preservation"]
+      }
+    },
+    {
+      "id": "lif-003",
+      "title": "Forgetting twice is a no-op and adds no version",
+      "category": "lifecycle",
+      "action": "lifecycle",
+      "query": "user relocation plans",
+      "lifecycle_steps": ["forget", "forget_again"],
+      "rationale": "M1 documents forgetting an already forgotten memory as a successful no-op; it must not rewrite history.",
+      "fixture": [
+        {"label": "target", "content": "The user plans to relocate to another city for a new role.", "memory_type": "EVENT", "confidence": 0.7, "importance": 0.6}
+      ],
+      "expected": {
+        "expected_versions": 2,
+        "metrics": ["history_preservation"]
+      }
+    },
+    {
+      "id": "lif-004",
+      "title": "A long chain of edits keeps every intermediate state",
+      "category": "lifecycle",
+      "action": "lifecycle",
+      "query": "user relocation plans",
+      "lifecycle_steps": ["update", "archive", "update", "forget"],
+      "rationale": "Five versions means four auditable transitions, none of which overwrote the previous state.",
+      "fixture": [
+        {"label": "target", "content": "The user plans to relocate to another city for a new role.", "memory_type": "EVENT", "confidence": 0.7, "importance": 0.6}
+      ],
+      "expected": {
+        "expected_versions": 5,
+        "metrics": ["history_preservation"]
+      }
+    },
+    {
+      "id": "lif-005",
+      "title": "An archived memory can still be updated",
+      "category": "lifecycle",
+      "action": "lifecycle",
+      "query": "user relocation plans",
+      "lifecycle_steps": ["archive", "update"],
+      "rationale": "Archive is not a tombstone: an archived memory stays editable and its history keeps growing.",
+      "fixture": [
+        {"label": "target", "content": "The user plans to relocate to another city for a new role.", "memory_type": "EVENT", "confidence": 0.7, "importance": 0.6}
+      ],
+      "expected": {
+        "expected_versions": 3,
+        "metrics": ["history_preservation"]
+      }
+    },
+
+    {
+      "id": "agt-001",
+      "title": "Candidates are proposed but not stored when storage is off",
+      "category": "agent",
+      "action": "agent",
+      "query": "Summarise what you know about my editor preferences.\nremember: [PREFERENCE] The user prefers the dark theme.",
+      "store_candidates": false,
+      "rationale": "The write policy is opt-in: the model may propose a memory, but nothing is persisted without permission.",
+      "fixture": [
+        {"label": "editor", "content": "The user types fastest in a keyboard driven editor.", "memory_type": "PREFERENCE", "confidence": 0.8, "importance": 0.6}
+      ],
+      "expected": {
+        "required": ["editor"],
+        "expected_stored": 0,
+        "token_budget": 1200,
+        "metrics": ["memory_write_policy_compliance", "recall_relevance"]
+      }
+    },
+    {
+      "id": "agt-002",
+      "title": "Candidates are stored when storage is explicitly permitted",
+      "category": "agent",
+      "action": "agent",
+      "query": "Note my editor preferences.\nremember: [PREFERENCE] The user prefers the dark theme.",
+      "store_candidates": true,
+      "rationale": "With permission granted, the same proposal must be persisted.",
+      "fixture": [
+        {"label": "editor", "content": "The user types fastest in a keyboard driven editor.", "memory_type": "PREFERENCE", "confidence": 0.8, "importance": 0.6}
+      ],
+      "expected": {
+        "required": ["editor"],
+        "expected_stored": 1,
+        "token_budget": 1200,
+        "metrics": ["memory_write_policy_compliance", "recall_relevance"]
+      }
+    },
+    {
+      "id": "agt-003",
+      "title": "A malformed candidate is rejected even when storage is permitted",
+      "category": "agent",
+      "action": "agent",
+      "query": "Remember this about my setup.\nremember: [HOLOGRAM] The user is a pilot.",
+      "store_candidates": true,
+      "rationale": "Provider output is untrusted input: an unknown memory type must be rejected, not coerced.",
+      "fixture": [
+        {"label": "setup", "content": "The user keeps two monitors on an adjustable arm.", "memory_type": "FACT", "confidence": 0.7, "importance": 0.5}
+      ],
+      "expected": {
+        "required": ["setup"],
+        "expected_stored": 0,
+        "token_budget": 1200,
+        "metrics": ["memory_write_policy_compliance", "recall_relevance"]
+      }
+    },
+    {
+      "id": "agt-004",
+      "title": "A relevant memory is recalled and an unrelated one is not",
+      "category": "agent",
+      "action": "agent",
+      "query": "What do you know about my Python experience and my weekend plans?",
+      "store_candidates": false,
+      "rationale": "The compiled context must hold the relevant memory and must not be dominated by unrelated ones.",
+      "fixture": [
+        {"label": "python", "content": "The user has shipped three Python services in production.", "memory_type": "FACT", "confidence": 0.9, "importance": 0.8},
+        {"label": "weekend", "content": "The user repairs bicycles on weekend afternoons.", "memory_type": "OBSERVATION", "confidence": 0.6, "importance": 0.3},
+        {"label": "pet", "content": "The user adopted a tabby cat named Pepper.", "memory_type": "EVENT", "confidence": 0.7, "importance": 0.4}
+      ],
+      "expected": {
+        "required": ["python", "weekend"],
+        "forbidden": ["pet"],
+        "expected_stored": 0,
+        "token_budget": 1200,
+        "metrics": ["memory_write_policy_compliance", "recall_relevance"]
+      }
+    },
+    {
+      "id": "agt-005",
+      "title": "A small talk request recalls nothing",
+      "category": "agent",
+      "action": "agent",
+      "query": "thanks",
+      "store_candidates": false,
+      "rationale": "The memory gate is a heuristic and it must short circuit small talk before any retrieval happens.",
+      "fixture": [
+        {"label": "editor", "content": "The user types fastest in a keyboard driven editor.", "memory_type": "PREFERENCE", "confidence": 0.8, "importance": 0.6}
+      ],
+      "expected": {
+        "forbidden": ["editor"],
+        "expected_stored": 0,
+        "token_budget": 1200,
+        "metrics": ["memory_write_policy_compliance", "recall_relevance"]
+      }
+    },
+    {
+      "id": "agt-006",
+      "title": "Two permitted candidates are both stored",
+      "category": "agent",
+      "action": "agent",
+      "query": "Record my setup preferences.\nremember: [PREFERENCE] The user prefers a dark theme.\nremember: [FACT] The user owns a mechanical keyboard.",
+      "store_candidates": true,
+      "rationale": "Permitting storage must actually store every valid proposal, not just the first.",
+      "fixture": [
+        {"label": "monitor", "content": "The user keeps two monitors on an adjustable arm.", "memory_type": "FACT", "confidence": 0.7, "importance": 0.5}
+      ],
+      "expected": {
+        "required": ["monitor"],
+        "expected_stored": 2,
+        "token_budget": 1200,
+        "metrics": ["memory_write_policy_compliance", "recall_relevance"]
+      }
+    }
+  ]
+}

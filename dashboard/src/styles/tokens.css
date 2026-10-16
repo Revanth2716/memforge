@@ -1,0 +1,83 @@
+/* Design tokens and the two themes.
+ *
+ * Palette chosen for an engineering console: a neutral slate surface, one blue
+ * accent, and three status colours that are colour-blind-safe in both themes.
+ * No gradients, no decorative imagery.
+ */
+
+:root {
+  color-scheme: dark;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 10px;
+
+  --sidebar-width: 232px;
+  --header-height: 56px;
+  --content-max: 1480px;
+
+  --step--1: 0.75rem;
+  --step-0: 0.8125rem;
+  --step-1: 0.9375rem;
+  --step-2: 1.125rem;
+  --step-3: 1.5rem;
+  --step-4: 2rem;
+}
+
+:root,
+[data-theme="dark"] {
+  --bg: #0a0c10;
+  --bg-elevated: #0f1218;
+  --surface: #12161d;
+  --surface-hover: #171c24;
+  --surface-sunken: #0c0f14;
+  --border: #1e242e;
+  --border-strong: #2b333f;
+  --text: #e7ebf2;
+  --text-muted: #98a2b3;
+  --text-faint: #6b7484;
+  --accent: #5b9cff;
+  --accent-soft: rgba(91, 156, 255, 0.14);
+  --accent-text: #9dc2ff;
+  --ok: #3fb950;
+  --ok-soft: rgba(63, 185, 80, 0.14);
+  --warn: #d29922;
+  --warn-soft: rgba(210, 153, 34, 0.14);
+  --bad: #f85149;
+  --bad-soft: rgba(248, 81, 73, 0.14);
+  --neutral-soft: rgba(152, 162, 179, 0.14);
+  --selection: rgba(91, 156, 255, 0.28);
+  --shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #f6f7f9;
+  --bg-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-hover: #f1f3f7;
+  --surface-sunken: #eef1f5;
+  --border: #d9dee7;
+  --border-strong: #b8c1cf;
+  --text: #141922;
+  --text-muted: #58606e;
+  --text-faint: #767f8d;
+  --accent: #1f6feb;
+  --accent-soft: rgba(31, 111, 235, 0.1);
+  --accent-text: #0b4fbd;
+  --ok: #1a7f37;
+  --ok-soft: rgba(26, 127, 55, 0.12);
+  --warn: #9a6700;
+  --warn-soft: rgba(154, 103, 0, 0.12);
+  --bad: #cf222e;
+  --bad-soft: rgba(207, 34, 46, 0.1);
+  --neutral-soft: rgba(88, 96, 110, 0.12);
+  --selection: rgba(31, 111, 235, 0.18);
+  --shadow: 0 1px 2px rgba(16, 22, 30, 0.06);
+}
