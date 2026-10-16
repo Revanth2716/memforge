@@ -1,60 +1,114 @@
 # MemForge
 
-**Local-first persistent memory & context engineering platform for AI agents.**
+**Persistent Memory & Context Engineering Platform for AI Agents.**
 
-Milestone 1 — *Memory Core*: deterministic, offline memory storage with a
-versioned REST API backed by SQLite.
-Milestone 2 — *Memory Intelligence*: deterministic importance scoring, temporal
-decay, duplicate detection, conflict detection and conflict resolution, all
-computed from the stored data with no LLM and no embeddings.
-Milestone 3 — *Memory Retrieval*: memory-aware hybrid retrieval with a
-documented ranking formula, conflict-aware results, duplicate suppression and
-full explainability — deterministic and offline by default.
-Milestone 4 — *Context Engineering*: a deterministic **context compiler** that
-turns retrieved memories into a budgeted, ordered, fully explained agent
-context.
-Milestone 5 — *Agent Integration*: a bounded, memory-aware agent, a pluggable
-LLM provider (a deterministic **mock by default**, an opt-in custom
-OpenAI-compatible API), and an **MCP server** exposing the memory layer as tools.
-Milestone 6 — *Evaluation and Observability*: a deterministic **36-case
-evaluation** of the memory decisions themselves, and an append-only **trace
-lifecycle** you can read back operation by operation.
-Milestone 7 — *Control Plane*: a **React + TypeScript dashboard** over the real
-memory, retrieval, context, agent, evaluation and observability APIs.
+Local-first, deterministic memory infrastructure that gives AI agents persistent,
+versioned, and explainable memory — with no API keys, no network calls, and no
+per-call cost on the default path.
 
-> M2 and M3 ship **deterministic lexical/text heuristics**. M3 has a pluggable
-> embedding interface (a model-free local provider by default, Ollama
-> optionally). M4 adds a **documented token estimator**, budgeted selection,
-> prompt ordering and deterministic (never paraphrasing) compression. M5 adds the
-> agent loop, the provider interface and MCP. M7 adds the dashboard that renders
-> all of it over the existing API — see [M7](#m7-control-plane).
+## Value Proposition
 
----
+| Capability | What it means |
+|---|---|
+| **Persistent, versioned memory** | SQLite-backed storage with append-only history (`CREATED → UPDATED → FORGOTTEN`). Nothing is ever destroyed. |
+| **Memory intelligence** | Deterministic importance scoring, temporal decay, lexical duplicate/conflict detection, and resolution — no LLM, no embeddings required. |
+| **Memory-aware retrieval** | Hybrid search with memory-aware ranking, duplicate suppression, conflict metadata, and per-result explanation. |
+| **Token-budgeted context compilation** | Deterministic context compiler with hard budget guarantees, full provenance, and a decision for every candidate. |
+| **Custom OpenAI-compatible LLM API** | Pluggable provider: deterministic mock by default, custom API opt-in via environment variables. |
+| **MCP integration** | Memory layer exposed as MCP tools (`memory.store`, `memory.search`, `memory.recall`, `memory.update`, `memory.forget`, `memory.compile_context`, `memory.explain`). |
+| **Deterministic evaluation** | 36-case benchmark of memory decisions, measured against documented rules — no LLM-as-a-judge. |
+| **Observability & tracing** | Append-only trace lifecycle with safe, credential-free metadata. |
+| **React control plane** | Dashboard over the real REST API — Dashboard, Memories, Retrieval Lab, Context Compiler, Agent Playground, Traces, Evaluation, Metrics. |
 
-> **The mock provider is the mandatory, reproducible mode.** No API key, no
-> network, no model. Every test, the demo and the smoke test run offline by
-> default. A real API is opt-in through environment variables only — see
-> [M5](#m5-agent-integration--custom-api).
-
-## The problem
+## Why MemForge?
 
 AI agents are stateless. Every new session starts from zero, so anything the agent
-"learned" about a user, a project or a task is lost unless an application
-re-implements memory from scratch — usually as a bag of strings in a table with no
-versioning, no lifecycle rules and no way to answer *"what did we know last week,
-and why did we believe it?"*.
+"learned" about a user, a project, or a task is lost unless an application re-implements
+memory from scratch — usually as a bag of strings in a table with no versioning, no
+lifecycle rules, and no way to answer *"what did we know last week, and why did we
+believe it?"*.
 
-Managed memory services solve this by sending the user's data to someone else's
-API. MemForge takes the opposite approach: **the memory layer is a plain local
-library** — a SQLite file plus typed Python — that an agent can embed directly,
-with no network access, no API keys and no per-call cost.
+Simple chat-history storage is insufficient because it lacks:
+- **Versioning** — no way to trace how a belief changed over time
+- **Lifecycle rules** — no soft-delete, no history, no audit trail
+- **Intelligence** — no scoring, decay, duplicate detection, or conflict resolution
+- **Explainability** — no record of why a memory was selected, suppressed, or ranked first
+- **Budget control** — no token-budgeted context for the agent's prompt
+
+Managed memory services solve this by sending your data to someone else's API. MemForge
+takes the opposite approach: **the memory layer is a plain local library** — a SQLite file
+plus typed Python — that an agent can embed directly, with no network access, no API keys,
+and no per-call cost.
+
+## Architecture at a Glance
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      React Control Plane (M7)                    │
+│  Dashboard · Memories · Retrieval Lab · Context · Agent · Traces │
+└──────────────────────────┬───────────────────────────────────────┘
+                           │ REST API (FastAPI)
+┌──────────────────────────▼───────────────────────────────────────┐
+│                   Memory Operations Service (M5)                  │
+│  AgentService · ContextCompilerService · MemoryRetrievalService   │
+│  MemoryService · LLMProvider (mock \| custom)                     │
+└──────────────────────────┬───────────────────────────────────────┘
+                           │ Storage interface
+┌──────────────────────────▼───────────────────────────────────────┐
+│                    SQLite Repository (M1/M2)                      │
+│  memories · memory_versions · memory_relationships · embeddings   │
+│  traces · trace_events                                            │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+Layered dependencies point one way: domain → storage → services → API. No layer reaches
+back up. Providers and clocks sit behind interfaces, making every behavior deterministic
+and reproducible.
+
+## Verified Results
+
+These are **measured project results** from the test suite and smoke tests — not claims
+of universal AI quality.
+
+| Area | Result |
+|---|---|
+| Backend tests | 1,526 passed |
+| Test coverage | 99% |
+| HTTP smoke checks | 30/30 passed |
+| MCP self-test checks | 11/11 passed |
+| Frontend tests | 186 passed |
+| Frontend production build | Passed |
+| Evaluation cases | 36 cases, 36/36 passed |
+| Evaluation overall score | 0.991 |
+| Retrieval precision | 0.793 (measured, not rounded up) |
+
+The evaluation measures whether MemForge made the decisions its own documented rules
+prescribe, for the shipped fixtures and queries. It is not a claim about general memory
+quality.
+
+## 30-Second Demo
+
+1. **Dashboard** — real memory counts, operational counters, evaluation score, latest traces
+2. **Retrieval Lab** — run a query; read why each result ranked where it did, factor by factor
+3. **Context Compiler** — compile under a hard token budget; see selected vs. suppressed candidates with reasons
+4. **Agent Playground** — one memory-aware turn: gate → recall → compile → provider → answer → trace id
+5. **Trace** — follow the turn's event timeline, operation by operation
+6. **Evaluation** — the real 36-case score, every metric with its numerator and denominator
+
+## Cost
+
+- **Deterministic mock provider by default** — no API key, no network, no model
+- **No paid API required** for the default path; all tests, demos, and smoke tests run offline
+- **Custom API is opt-in** — configure `MEMFORGE_LLM_PROVIDER=custom` with environment variables only; never a file, never the database
+
+---
 
 ## What MemForge is
 
 MemForge is a reusable **memory infrastructure layer**.
 
 | Primitive | Meaning |
-| --- | --- |
+|---|---|
 | **Store** | Create a typed memory (`FACT`, `PREFERENCE`, `PROFILE`, `EVENT`, `TASK`, `OBSERVATION`) with `confidence` and `importance`. |
 | **Retrieve** | Fetch by id, or list with `status` / `memory_type` filters and pagination. |
 | **Update** | Partially patch a memory; a new history version is appended. |
@@ -70,6 +124,27 @@ MemForge is a reusable **memory infrastructure layer**.
 
 Everything is deterministic and offline: no LLM, no embedding model and no network
 call sits on the default path.
+
+## Control Plane
+
+The M7 dashboard is a React + TypeScript presentation layer over the real MemForge API.
+It adds no AI capability, no memory of its own, and no backend logic — every number it
+renders was returned by MemForge for the corpus currently in SQLite.
+
+### Dashboard
+![MemForge Dashboard](docs/screenshots/01-dashboard-overview.png)
+
+### Retrieval Intelligence
+![Retrieval Lab](docs/screenshots/03-retrieval-lab.png)
+
+### Context Engineering
+![Context Compiler](docs/screenshots/04-context-compiler.png)
+
+### Agent + Trace
+![Agent Playground](docs/screenshots/05-agent-playground.png)
+
+### Evaluation
+![Evaluation](docs/screenshots/07-evaluation.png)
 
 ## Architecture
 
@@ -115,7 +190,7 @@ app/cli     → deterministic demo walkthrough
 scripts/    → live HTTP smoke test, MCP self-test, optional live-API smoke test
 ```
 
-Design rules that the code follows:
+### Design rules
 
 - **Layered dependencies point one way.** The domain imports nothing but the
   standard library; storage imports the domain; services import storage
@@ -134,7 +209,7 @@ Design rules that the code follows:
 ### Data model
 
 | Table | Notes |
-| --- | --- |
+|---|---|
 | `memories` | `id` (PK), `content`, `memory_type`, `source`, `confidence`, `importance`, `status`, `created_at`, `updated_at`, `version`, plus M2 telemetry `access_count`, `last_accessed_at`. |
 | `memory_versions` | `id` (PK), `memory_id` (FK → `memories`, `ON DELETE CASCADE`), `version`, `change`, full snapshot, `recorded_at`; `UNIQUE (memory_id, version)`. |
 | `memory_relationships` *(M2)* | `id` (PK), `source_id` (FK), `target_id` (FK), `relationship`, `similarity`, `created_at`; `UNIQUE (source_id, target_id, relationship)`, `CHECK (source_id <> target_id)`, `CHECK (relationship IN (...))`, `CHECK (similarity IS NULL OR 0 <= similarity <= 1)`. |
@@ -149,7 +224,7 @@ for newest-first pagination, `(memory_id, version)` for history, and
 Base URL: `http://127.0.0.1:8000`
 
 | Method | Path | Description |
-| --- | --- | --- |
+|---|---|---|
 | `GET` | `/health` | Liveness + storage check. |
 | `POST` | `/api/v1/memories` | Create a memory → `201`. |
 | `GET` | `/api/v1/memories` | List `ACTIVE` memories (newest first). Filters: `status`, `memory_type`, `limit` (1–100, default 50), `offset`. |
@@ -167,6 +242,12 @@ Base URL: `http://127.0.0.1:8000`
 | `POST` | `/api/v1/context/compile` *(M4)* | Compile retrieved memories into a budgeted context: `query`, `token_budget`, `top_k`, filters and compression options. |
 | `POST` | `/api/v1/agent/respond` *(M5)* | Answer a request using compiled memory context. |
 | `POST` | `/api/v1/memories/remember` *(M5)* | Store a memory and report its near-duplicates. |
+| `GET` | `/api/v1/traces` *(M6)* | Recent trace headers. Filters: `kind`, `limit` (1-200, default 20). |
+| `GET` | `/api/v1/traces/{id}` *(M6)* | One trace with its attributes and derived summary. |
+| `GET` | `/api/v1/traces/{id}/events` *(M6)* | That trace's events, in recorded sequence order. |
+| `GET` | `/api/v1/metrics` *(M6)* | Operational counters derived from recorded events. |
+| `GET` | `/api/v1/evaluations/latest` *(M6)* | The latest run of the shipped evaluation dataset. |
+| `GET` | `/api/v1/evaluations/{name@version}` *(M6)* | One evaluation run by reference (also accepts `memory-core`). |
 
 ### Example session
 
@@ -213,7 +294,7 @@ Every error uses the same envelope:
 ```
 
 | HTTP | Code | When |
-| --- | --- | --- |
+|---|---|---|
 | 400 | `MEMORY_VALIDATION_ERROR` | A domain invariant was violated. |
 | 400 | `INVALID_RELATIONSHIP` | A relationship is invalid (self-link, unknown kind, bad similarity). |
 | 400 | `CONTEXT_VALIDATION_ERROR` *(M4)* | A context request is invalid (e.g. a budget above the configured maximum). |
@@ -340,7 +421,7 @@ default path is **lexical-only** and requires no embedding provider at all.
 ### Retrieval modes
 
 | Mode | Meaning |
-| --- | --- |
+|---|---|
 | `lexical` (default) | Deterministic inverted-index search. Always available. |
 | `semantic` | Embedding similarity only. Requires an available provider. |
 | `hybrid` | Documented blend of both. Requires an available provider. |
@@ -405,7 +486,7 @@ representative. Nothing is modified.
 ### Embedding providers (all optional)
 
 | Provider | Behaviour |
-| --- | --- |
+|---|---|
 | *(none, default)* | Lexical retrieval only. No embeddings, no server. |
 | `hashed` | Deterministic, model-free, offline: normalised tokens hashed into an L2-normalised vector. Captures token overlap (including the morphological variants the normaliser handles); **cannot** capture synonymy or paraphrase. |
 | `ollama` | Optional local embeddings from an Ollama server (`MEMFORGE_OLLAMA_EMBEDDING_MODEL`, `MEMFORGE_OLLAMA_ENDPOINT`, `MEMFORGE_OLLAMA_TIMEOUT_SECONDS`). Probed with a short timeout, cached briefly, and never required. |
@@ -460,28 +541,9 @@ Retrieval answers **"which memories are relevant?"**. Context compilation answer
 different question: **"given everything that is relevant, what is the best context
 an agent can actually be given, under a hard budget, and why?"**
 
-```
-MEMORY RETRIEVAL (M3)
-        |
-        v
-CONTEXT COMPILER (M4)   ── budget, utility, suppression, ordering, provenance
-        |
-        v
-BUDGETED AGENT CONTEXT
-```
-
 The compiler is **not** summarisation, **not** a chatbot and **not** another RAG
 pipeline. It contains no LLM, no network call and no provider tokenizer. It is a
-pure function of (retrieved candidates, policy, request, budget):
-
-```
-API  ->  ContextCompilerService  ->  MemoryRetrievalService  ->  repository / embeddings
-```
-
-The dependency arrow points one way. Retrieval stays M3's job: candidate
-generation, relevance, ranking, conflict and duplicate metadata all come from
-there. M4 adds only what retrieval cannot decide — *what fits*, *in what order*,
-and *with what justification*.
+pure function of (retrieved candidates, policy, request, budget).
 
 ### 1. Token estimation (`memforge-char-word/v1`)
 
@@ -550,15 +612,10 @@ utility      = value * (1 - 0.35 * cost_penalty)
    lowest-priority block is dropped until it fits. This step normally does not
    run and deliberately does *not* re-admit anything.
 
-Worked example (`token_budget = 1000`, candidates 420 / 260 / 240 / 210 tokens):
-the highest-utility candidate that fits is admitted, the next is tried against
-the reduced remainder, and so on. Nothing is ever returned beyond the budget, and
-every rejection says how many tokens it needed and how many were left.
-
 ### 4. Conflicts and duplicates
 
 | Situation | Decision | Reason code |
-| --- | --- | --- |
+|---|---|---|
 | M2 recorded `SUPERSEDES` | The loser never enters the context; the winner is named | `conflict_superseded` |
 | Conflict still `unresolved` | Both stay candidates; M3's `0.5` penalty already demoted them | *(none)* |
 | Recorded `DUPLICATE_OF` inside the candidate set | Highest utility (ties by id) represents the whole group | `duplicate_of` |
@@ -576,7 +633,7 @@ Retrieval rank is *not* prompt order. Blocks are grouped into documented section
 and ordered by `(section_rank, -utility, memory_id)`:
 
 | Rank | Section | Memory types | Rationale |
-| --- | --- | --- | --- |
+|---|---|---|---|
 | 0 | `PROFILE` | `PROFILE`, `PREFERENCE` | stable identity and stated preferences first |
 | 1 | `FACTS` | `FACT` | durable, authoritative statements |
 | 2 | `RECENT EVENTS` | `EVENT` | what happened lately |
@@ -633,78 +690,8 @@ Every candidate — selected or not — appears once in `selection_trace`:
 
 Reasons: `selected`, `duplicate_of`, `conflict_superseded`,
 `below_minimum_score`, `memory_type_filtered`, `excluded_by_id`,
-`not_in_include_ids`, `insufficient_budget`. No explanation is LLM-generated —
-every `detail` is built from the numbers that produced the decision.
-
-### 8. Example
-
-```powershell
-curl -s -X POST http://127.0.0.1:8000/api/v1/context/compile `
-  -H 'content-type: application/json' `
-  -d '{"query": "preferred backend language", "token_budget": 1200, "top_k": 20}'
-```
-
-```json
-{
-  "query": "preferred backend language",
-  "token_budget": 1200,
-  "estimated_tokens": 1047,
-  "remaining_tokens": 153,
-  "within_budget": true,
-  "utilization": 0.8725,
-  "candidates_considered": 31,
-  "selected_count": 9,
-  "suppressed_count": 8,
-  "retrieval_mode": "hybrid",
-  "context_text": "PROFILE\n-------\n- User prefers Python for backend work.\n\nFACTS\n-----\n- …",
-  "blocks": [
-    {
-      "memory_id": "…",
-      "memory_type": "PROFILE",
-      "source": "user:revanth",
-      "confidence": 0.9,
-      "importance": 0.8,
-      "content": "User prefers Python for backend work.",
-      "rendered_content": "User prefers Python for backend work.",
-      "section": "PROFILE",
-      "order": 0,
-      "relevance": 0.91,
-      "retrieval_score": 0.78,
-      "utility_score": 0.87,
-      "estimated_tokens": 124,
-      "compression": {
-        "original_text": "User prefers Python for backend work.",
-        "compressed_text": "User prefers Python for backend work.",
-        "applied": [],
-        "original_tokens": 124,
-        "compressed_tokens": 124,
-        "tokens_saved": 0,
-        "truncated": false,
-        "retained_segments": []
-      },
-      "conflicts": []
-    }
-  ],
-  "selection_trace": [],
-  "suppressed_candidates": [],
-  "explanation": {
-    "estimator": "memforge-char-word/v1",
-    "estimator_formula": "memforge-char-word/v1: estimated = max(1, ceil(max(…)))",
-    "utility_formula": "utility = value * (1 - 0.35 * min(1, tokens/120)) where value = …",
-    "ordering_policy": "section-then-utility/v1",
-    "section_order": ["PROFILE", "FACTS", "RECENT_EVENTS", "TASKS", "OBSERVATIONS"],
-    "selection_counts": {"selected": 9, "insufficient_budget": 8},
-    "notes": [
-      "token counts are MemForge estimates …, not provider tokenisations …",
-      "context is compiled with no LLM: content is never paraphrased or summarised",
-      "…"
-    ]
-  }
-}
-```
-
-(The figures above illustrate the shape of the response; the demo prints a real
-run with real numbers — see [Demo](#demo).)
+`insufficient_budget`. No explanation is LLM-generated — every `detail` is built
+from the numbers that produced the decision.
 
 ## M5: agent integration + custom API
 
@@ -727,7 +714,7 @@ app/services/llm/factory.py          build_llm_provider(settings)
 ```
 
 | Operation | Returns |
-| --- | --- |
+|---|---|
 | `generate(request)` | `LLMResponse(text, provider, model, usage, latency_ms, finish_reason, response_id, request_metadata)` |
 | `generate_structured(request)` | the same, plus `structured` — a parsed JSON object validated against `request.response_schema` |
 
@@ -746,14 +733,14 @@ Three rules are structural, not conventions:
 Configuration (environment only — never a file, never the database):
 
 | Variable | Default | Meaning |
-| --- | --- | --- |
+|---|---|---|
 | `MEMFORGE_LLM_PROVIDER` | `mock` | `mock` or `custom` |
 | `MEMFORGE_LLM_BASE_URL` | *(empty)* | Base URL of an OpenAI-compatible API, e.g. `https://host/v1` |
 | `MEMFORGE_LLM_API_KEY` | *(empty)* | Bearer credential. **Never logged, never persisted, never returned** |
 | `MEMFORGE_LLM_MODEL` | *(empty)* | Model identifier sent in the request |
 | `MEMFORGE_LLM_TIMEOUT_SECONDS` | `30` | Per-request timeout |
 | `MEMFORGE_LLM_MAX_RETRIES` | `2` | Extra attempts after the first (`0` disables retrying) |
-| `MEMFORGE_LLM_RETRY_BACKOFF_SECONDS` | `0.5` | Linear backoff base |
+| `MEMFORGE_LLM_RETRY_BACKOFF_SECONDS` | `0.5` | Linear backoff base between attempts |
 | `MEMFORGE_LLM_CHAT_PATH` | `/chat/completions` | Path of the compatible contract |
 | `MEMFORGE_LLM_SEND_AUTHORIZATION` | `true` | Set `false` for an endpoint needing no credential |
 
@@ -769,14 +756,14 @@ Content-Type: application/json
 {"model": "...", "messages": [{"role": "user", "content": "..."}],
  "temperature": 0.0, "max_tokens": 512,
  "response_format": {"type": "json_schema",
-                     "json_schema": {"name": "...", "schema": {...}, "strict": true}}}
+                    "json_schema": {"name": "...", "schema": {...}, "strict": true}}}
 ```
 
 The first choice's `message.content` is the answer; `usage` is used only when
 present. Failure normalisation:
 
 | Condition | Error | HTTP | Retryable |
-| --- | --- | --- | --- |
+|---|---|---|---|
 | missing base URL / model / key | `LLMNotConfiguredError` | `503` | no |
 | timeout | `LLMTimeoutError` | `504` | yes |
 | 401 / 403 | `LLMAuthenticationError` | `502` | no |
@@ -824,7 +811,7 @@ being stored or silently dropped.
 ### 4. API
 
 | Method | Path | Description |
-| --- | --- | --- |
+|---|---|---|
 | `POST` | `/api/v1/agent/respond` *(M5)* | One memory-aware turn: `request`, `token_budget`, `top_k`, `use_memory`, `context_only`, `extract_candidates`, `store_candidates`. |
 | `POST` | `/api/v1/memories/remember` *(M5)* | Store a memory and report its M2 near-duplicates. |
 | `GET` | `/api/v1/traces` *(M6)* | Recent trace headers. Filters: `kind`, `limit` (1-200, default 20). |
@@ -833,12 +820,6 @@ being stored or silently dropped.
 | `GET` | `/api/v1/metrics` *(M6)* | Operational counters derived from recorded events. |
 | `GET` | `/api/v1/evaluations/latest` *(M6)* | The latest run of the shipped evaluation dataset. |
 | `GET` | `/api/v1/evaluations/{name@version}` *(M6)* | One evaluation run by reference (also accepts `memory-core`). |
-
-```powershell
-curl -s -X POST http://127.0.0.1:8000/api/v1/agent/respond `
-  -H 'content-type: application/json' `
-  -d '{"request": "Which backend language should I use?", "token_budget": 800}'
-```
 
 The response carries the answer, the memory-gate decision, the compiled context,
 block provenance, candidate memories (reported, not stored), and an
@@ -853,7 +834,7 @@ Built on the official Python SDK (`mcp`). Every tool is a thin adapter over
 `MemoryOperationsService`; none of them touch a language-model provider.
 
 | Tool | Purpose | MCP annotation |
-| --- | --- | --- |
+|---|---|---|
 | `memory.store` | store a memory (M1) | write |
 | `memory.search` | ranked search (M3) | read-only |
 | `memory.recall` | agent recall with a relevance gate (M3) | read-only |
@@ -975,9 +956,9 @@ CaseResult -> MetricResult -> EvaluationSummary
 Three rules make the numbers trustworthy:
 
 1. **Nothing is re-implemented.** A case never scores memories itself. It asks
-   M3 to search, M2 to detect and resolve, M4 to compile, M5 to run a turn -- then
-   it counts what came back. There is no second scoring path that could agree
-   with the real one by accident.
+   M3 to search, M2 to detect and resolve, M4 to compile, M5 to run a turn --
+   then it counts what came back. There is no second scoring path that could
+   agree with the real one by accident.
 2. **Every case is isolated.** Fresh SQLite file, manual clock and a private
    deterministic id namespace per case. Cases cannot leak state into each other
    and two runs are identical.
@@ -987,8 +968,8 @@ Three rules make the numbers trustworthy:
 ### 3. The metrics
 
 Every metric is a ratio of two integers the evaluation produced. The formulas are
-in `app/domain/evaluation.py::METRIC_DEFINITIONS` and printed by
-`--verbose`, so a reader never has to trust a name.
+in `app/domain/evaluation.py::METRIC_DEFINITIONS` and printed by `--verbose`, so
+a reader never has to trust a name.
 
 | Metric | Formula |
 |---|---|
@@ -1335,7 +1316,7 @@ origin is baked into the bundle. For a backend on a different origin, build with
 `VITE_MEMFORGE_API_BASE=https://memforge.example/api/v1`.
 
 | Command | What it does |
-| --- | --- |
+|---|---|
 | `npm run dev` | Vite dev server with the API proxy. |
 | `npm run build` | Typecheck, then build `dashboard/dist`. |
 | `npm run preview` | Serve the production build with the same proxy. |
@@ -1378,7 +1359,7 @@ Two rules the code follows:
 ### 3. Pages
 
 | Page | Route | Backend endpoints | What it is for |
-| --- | --- | --- | --- |
+|---|---|---|---|
 | **Dashboard** | `/` | `GET /memories?status=...`, `GET /metrics`, `GET /evaluations/latest`, `GET /traces` | Live summary, the 30-60 s demo path, latest traces and evaluation. |
 | **Memories** | `/memories`, `/memories/{id}` | `GET /memories`, `GET/PATCH/DELETE /memories/{id}`, `/history`, `/intelligence`, `/duplicates`, `/conflicts`, `/relationships` | The stored, versioned corpus: filters, pagination, the v1 -> v2 -> v3 history, computed intelligence, duplicate/conflict evidence. |
 | **Retrieval Lab** | `/retrieval` | `POST /memories/search` | Run a query and read, factor by factor, why rank #1 ranked first. Suppression is shown, not hidden. |
@@ -1442,12 +1423,12 @@ Every step is a link on the Dashboard, so the path never has to be memorised.
 ```bash
 cd dashboard
 npm run typecheck      # strict tsc
-npm test               # the frontend suite
+npm test               # frontend tests
 npm run build          # typecheck + production build
 ```
 
 | File | Focus |
-| --- | --- |
+|---|---|
 | `tests/parse.test.ts` | Response-shape validation: what a drifted backend payload must do. |
 | `tests/client.test.ts` | Base URL, request construction, error envelope, malformed body, no auth header. |
 | `tests/format.test.ts` | Formatting only; no backend value is recomputed. |
@@ -1500,8 +1481,8 @@ level, and this extends the same idea to the presentation layer.
 - **The evaluation measures the shipped fixtures.** A score of 0.991 says the
   system made the decisions its own rules prescribe, for those corpora and those
   queries - not that memory quality is solved.
-- **No screenshot ships with this README.** None has been captured; add a real
-  one before publishing rather than pasting a mockup.
+- **Screenshots are real.** Captured from a live dashboard against a running
+  backend in `docs/screenshots/`. No mockups.
 
 ## Local setup
 
@@ -1537,7 +1518,7 @@ Interactive docs: <http://127.0.0.1:8000/docs>.
 Settings are read from the environment (prefix `MEMFORGE_`) or a local `.env`:
 
 | Setting | Default | Purpose |
-| --- | --- | --- |
+|---|---|---|
 | `MEMFORGE_DATABASE_PATH` | `<repo>/data/memforge.sqlite` | SQLite file. Parent directories are created automatically. |
 | `MEMFORGE_API_PREFIX` | `/api/v1` | Root path for the memory routes. |
 | `MEMFORGE_APP_NAME` | `MemForge` | Service name in `/health`. |
@@ -1613,11 +1594,8 @@ npm test                # frontend tests
 npm run build           # typecheck + production build
 ```
 
-
-The suite is organised by layer:
-
 | File | Focus |
-| --- | --- |
+|---|---|
 | `tests/test_domain_models.py` | Entity validation, enums, update semantics, sentinel behaviour. |
 | `tests/test_ids_and_clocks.py` | Deterministic id generation and the clock port. |
 | `tests/test_similarity.py` | Tokenisation, stop words, suffix rules, Dice values and boundaries. |
@@ -1966,7 +1944,7 @@ so there is nothing to leak and nothing to reach.
 ## Roadmap
 
 | Milestone | Theme |
-| --- | --- |
+|---|---|
 | **M1** ✅ | Memory core: domain model, SQLite persistence, versioned history, REST API. |
 | **M2** ✅ | Memory intelligence: importance scoring, temporal decay, lexical duplicate/conflict detection, deterministic resolution. |
 | **M3** ✅ | Semantics: embeddings behind a provider interface, hybrid retrieval ranking. |
@@ -1990,7 +1968,8 @@ memforge/
 │   └── observability/   # M6 trace service, instrumentation decorators, demo
 │   ├── config.py       # pydantic-settings configuration
 │   ├── domain/         # entities, enums, errors, ports, similarity, intelligence,
-│   │                   # retrieval, token estimation, context compilation
+│   │                   # retrieval, token estimation, context compilation,
+│   │                   # LLM contracts, agent workflow data
 │   ├── evaluation.py      # M6 dataset/case/result models, metric definitions
 │   └── observability.py   # M6 trace/event models, safe metadata
 │   ├── main.py         # application factory + ASGI entrypoint
@@ -2003,17 +1982,27 @@ memforge/
 │   │   ├── hooks/      # request state and theme
 │   │   ├── lib/        # formatting, redaction, trace tree, vocabulary
 │   │   ├── pages/      # the eight areas
-│   │   └── styles/     # design tokens, layout, components
-│   └── tests/          # frontend suite (fixtures captured from a live backend)
-├── data/               # local SQLite files (git-ignored)
-├── docs/               # architecture notes
-├── scripts/            # HTTP smoke test, MCP self-test, dashboard smoke test,
-│                       # optional live-API test
-├── tests/              # pytest suite
+│   │   └── styles/     # hand-written CSS
+│   ├── tests/          # frontend suite (Vitest + Testing Library)
+│   ├── dist/           # production build (git-ignored)
+│   ├── node_modules/   # dependencies (git-ignored)
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── vite.config.ts
+│   ├── tsconfig.json
+│   └── vitest.setup.ts
+├── docs/
+│   ├── architecture.md
+│   └── screenshots/    # real dashboard screenshots
+├── scripts/
+│   ├── smoke_test.py           # live HTTP smoke test (30/30 checks)
+│   ├── mcp_selftest.py         # MCP self-test (11/11 checks)
+│   ├── dashboard_smoke.py      # M7: dashboard build against real backend
+│   └── llm_smoke_test.py       # optional live API test (needs credentials)
+├── tests/              # backend test suite (1,526 tests)
+├── data/               # runtime SQLite files (git-ignored)
 ├── pyproject.toml
-└── README.md
+├── README.md
+└── .gitignore
 ```
 
-## License
-
-MIT.
